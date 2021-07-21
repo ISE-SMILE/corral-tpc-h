@@ -1,25 +1,36 @@
 package queries
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/ISE-SMILE/corral"
-	"github.com/google/martian/v3/log"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	b64 "encoding/base64"
+	"github.com/ISE-SMILE/corral"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type Q1 struct {
 	Experiment
-	shipdate time.Time
+	Shipdate time.Time
 }
 
+func (q *Q1) Default() {
+	date, _ := time.Parse("2006-01-02", "1998-09-01")
+	q.Shipdate = date
+}
+
+func (q *Q1) Randomize() {
+	//TODO:
+	q.Default()
+}
 
 func (q *Q1) Name() string {
-	return fmt.Sprintf("%s_tcp_q1",q.ShortName())
+	return fmt.Sprintf("%s_tcp_q1", q.ShortName())
 }
 
 func (q *Q1) Check(driver *corral.Driver) error {
@@ -28,54 +39,47 @@ func (q *Q1) Check(driver *corral.Driver) error {
 }
 
 func (q *Q1) Inputs() []string {
-	return inputTables(q,"lineitem")
+	return inputTables(q, "lineitem")
 }
 
 func (q *Q1) Configure() []corral.Option {
 	return []corral.Option{
 		corral.WithSplitSize(25 * 1024 * 1024),
 		corral.WithMapBinSize(100 * 1024 * 1024),
-		corral.WithReduceBinSize(10 * 1024 * 1024),
+		corral.WithReduceBinSize(200 * 1024 * 1024),
 	}
 }
 
 func (q *Q1) Validate(inputs []string) (bool, error) {
-	size := int64(0)
-	for _,f := range inputs {
-		stat, err := os.Stat(f)
+	buf := bytes.NewBuffer([]byte{})
+	for _, f := range inputs {
+		f, err := os.Open(f)
 		if err != nil {
 			return false, err
 		}
-		size = stat.Size() + size
+		_, err = io.Copy(buf, f)
+		if err != nil {
+			return false, err
+		}
 	}
-	log.Infof("total output %d",size)
-	return size >= 0,nil
+
+	for {
+		line, err := buf.ReadString('\n')
+		if err != nil {
+			break
+		}
+		fields := strings.Split(line, "|")
+		if len(fields) != 10 {
+			return false, fmt.Errorf("output invalid %s", line)
+		}
+	}
+
+	return true, nil
 }
 
 func (q *Q1) Create() []*corral.Job {
-	return []*corral.Job{corral.NewJob(q,q)}
+	return []*corral.Job{corral.NewJob(q, q)}
 }
-
-type lineitem int
-
-const (
-	L_ORDERKEY lineitem = iota
-	L_PARTKEY
-	L_SUPPKEY
-	L_LINENUMBER
-	L_QUANTITY
-	L_EXTENDEDPRICE
-	L_DISCOUNT
-	L_TAX
-	L_RETURNFLAG
-	L_LINESTATUS
-	L_SHIPDATE
-	L_COMMITDATE
-	L_RECEIPTDATE
-	L_SHIPINSTRUCT
-	L_SHIPMODE
-	L_COMMENT
-)
 
 /**sql
 	select
@@ -101,36 +105,40 @@ const (
 **/
 
 func (w *Q1) Map(key, value string, emitter corral.Emitter) {
-	//line := strings.FieldsFunc(value,
-	//	func(c rune) bool { return c == '|' })
-	line := strings.Split(value, "|")
-	if len(line) < 15 {
+	line := &LineItem{}
+
+	err := line.Read(value)
+	if err != nil {
+		log.Infof("failed to emit %s,+%v", key, err)
 		return
 	}
 
-	shipdate_value := line[L_SHIPDATE]
+	shipdate, err := line.GetAs("L_SHIPDATE", SQLDate)
+	if err != nil {
+		log.Infof("failed to emit %s,+%v", key, err)
+		return
+	}
 
-	s_year, _ := strconv.Atoi(shipdate_value[0:4])
-	s_month, _ := strconv.Atoi(shipdate_value[6:7])
-	s_day, _ := strconv.Atoi(shipdate_value[9:10])
-
-	//shipdate, _ := time.Parse("2006-01-02", line[L_SHIPDATE])
-	shipdate := time.Date(s_year, time.Month(s_month), s_day, 0, 0, 0, 0, time.Local)
-	if shipdate.Before(w.shipdate) {
-		l_returnflag := line[L_RETURNFLAG]
-		l_linestatus := line[L_LINESTATUS]
-		data := strings.Join([]string{
-			line[L_QUANTITY],
-			line[L_EXTENDEDPRICE],
-			line[L_DISCOUNT],
-			line[L_TAX],
-		}, "|")
-
-		sEnc := b64.StdEncoding.EncodeToString([]byte(data))
-
-		err := emitter.Emit(l_returnflag+"|"+l_linestatus, sEnc)
+	if shipdate.(time.Time).Before(w.Shipdate) {
+		key, err := line.SelectWithMask(int(L_RETURNFLAG), int(L_LINESTATUS))
 		if err != nil {
-			log.Infof("failed to emit %s,+%v",key,err)
+			log.Infof("failed to emit %s,+%v", key, err)
+			return
+		}
+		data, err := line.SelectWithMask(
+			int(L_QUANTITY),
+			int(L_EXTENDEDPRICE),
+			int(L_DISCOUNT),
+			int(L_TAX),
+		)
+		if err != nil {
+			log.Infof("failed to emit %s,+%v", key, err)
+			return
+		}
+
+		err = emitter.Emit(strings.Join(key, "|"), strings.Join(data, "|"))
+		if err != nil {
+			log.Infof("failed to emit %s,+%v", key, err)
 		}
 	}
 
@@ -154,8 +162,9 @@ func (w *Q1) Reduce(key string, values corral.ValueIterator, emitter corral.Emit
 	count := 0
 
 	for value := range values.Iter() {
-		data, _ := b64.StdEncoding.DecodeString(value)
-		line := strings.Split(string(data), "|")
+		//data, _ := b64.StdEncoding.DecodeString(value)
+		line := strings.Split(value, "|")
+		//log.Debugf("red(%s,%s)",key,line)
 
 		l_quantity := saveFloat(line, 0)
 		l_extendedprice := saveFloat(line, 1)
@@ -175,11 +184,11 @@ func (w *Q1) Reduce(key string, values corral.ValueIterator, emitter corral.Emit
 	avg_price := sum_base_price / float64(count)
 	avg_disc := sum_discount / float64(count)
 
-	value := fmt.Sprintf("%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%d", sum_qty, sum_base_price, sum_disc_price, sum_charge, avg_qty, avg_price, avg_disc, count)
+	value := fmt.Sprintf("|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%.2f|%d", sum_qty, sum_base_price, sum_disc_price, sum_charge, avg_qty, avg_price, avg_disc, count)
 
 	err := emitter.Emit(key, value)
 	if err != nil {
-		log.Infof("failed to emit %s,+%v",key,err)
+		log.Infof("failed to emit %s,+%v", key, err)
 	}
 
 }

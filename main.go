@@ -1,39 +1,39 @@
 package main
 
 import (
-	"github.com/ISE-SMILE/corral"
-	"github.com/spf13/viper"
-	"github.com/tawalaya/corral_plus_tpch/queries"
-	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/ISE-SMILE/corral"
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
+	"github.com/tawalaya/corral_plus_tpch/queries"
 )
 
-func init(){
+func init() {
 
 }
 
-func main(){
-
+func main() {
 
 	//TODO:
 
 	var query queries.Query
 
-	//TODO: make selectable
-	query = &queries.Q1{}
+	//TODO: make tuneable
+	query = queries.New(queries.TPCH_Q6)
 
 	//TODO: make tuneable
 	query.SetExperiment("1")
 	query.SetEndpoint("test")
 
-	viper.Set("logName",query.Name())
+	viper.Set("logName", query.Name())
 
 	options := query.Configure()
 
 	//TODO: Toggle Cache Backend
 	options = append(options,
-		corral.WithRedisBackedCache(),
+		corral.WithLocalMemoryCache(),
 		corral.WithInputs(query.Inputs()...),
 	)
 
@@ -50,29 +50,25 @@ func main(){
 	var results = driver.GetFinalOutputs()
 	temp, err := os.MkdirTemp("", "results")
 	if err != nil {
-		log.Fatalf("query %s failed to download results %+v",query.Name(),err)
+		log.Fatalf("query %s failed to download results %+v", query.Name(), err)
 	}
 	err = driver.DownloadAndRemove(results, temp)
 	if err != nil {
-		log.Fatalf("query %s failed to download results %+v",query.Name(),err)
+		log.Fatalf("query %s failed to download results %+v", query.Name(), err)
 	}
-	log.Printf("downloaded final resuts at %s",temp)
+	log.Printf("downloaded final resuts at %s", temp)
 
-
-	files,err := filepath.Glob(filepath.Join(temp,"*"))
+	files, err := filepath.Glob(filepath.Join(temp, "*"))
 	if err != nil {
-		log.Fatalf("query %s failed find downloaded files %+v",query.Name(),err)
+		log.Fatalf("query %s failed find downloaded files %+v", query.Name(), err)
 	}
 	//download results and validate ...
 	success, err := query.Validate(files)
 	if err != nil {
-		log.Fatalf("query %s result is invald %+v",query.Name(),err)
+		log.Fatalf("query %s result is invald %+v", query.Name(), err)
 	}
 	if !success {
-		log.Fatalf("query %s result did not match expectations",query.Name())
+		log.Fatalf("query %s result did not match expectations", query.Name())
 	}
-
-
-
 
 }
