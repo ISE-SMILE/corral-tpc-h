@@ -1,8 +1,15 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"math/rand"
 	"os"
 	"path/filepath"
+	"strings"
+	"text/template"
+	"time"
 
 	"github.com/ISE-SMILE/corral"
 	log "github.com/sirupsen/logrus"
@@ -11,64 +18,268 @@ import (
 )
 
 func init() {
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
+	log.Infof("using Seed %x", seed)
+}
 
+type runConfig struct {
+	Query      queries.QueryType `json:"query,omitempty"`
+	Backend    string            `json:"backend,omitempty"`
+	Experiment string            `json:"experiment,omitempty"`
+	Endpoint   string            `json:"endpoint,omitempty"`
+
+	Undeploy   bool `json:"undeploy,omitempty"`
+	Randomize  bool `json:"randomize,omitempty"`
+	Validation bool `json:"validation,omitempty"`
+
+	Cache string `json:"cache,omitempty"`
+}
+
+func (c runConfig) ShortName() string {
+	return fmt.Sprintf("%.2s_%.2X", c.Backend, c.Cache)
+}
+
+func (c runConfig) SetupCache(options []corral.Option) []corral.Option {
+
+	switch c.Backend {
+	case "lambda":
+		viper.Set("redisDeploymentType", 2)
+	case "whisk":
+		viper.Set("redisDeploymentType", 1)
+	case "local":
+		fallthrough
+	default:
+		viper.Set("redisDeploymentType", 0)
+
+	}
+
+	switch c.Cache {
+	case "local":
+		return append(options, corral.WithLocalMemoryCache())
+	case "redis":
+		return append(options, corral.WithRedisBackedCache())
+
+	}
+	return options
+}
+
+//loadConfig tries to a.) find the config file and loads it
+func loadConfig() runConfig {
+
+	var conf runConfig = runConfig{
+		Query:      queries.TPCH_Q2,
+		Backend:    "",
+		Experiment: "1",
+		Endpoint:   "test",
+		Undeploy:   false,
+		Randomize:  false,
+		Validation: false,
+		Cache:      "local",
+	}
+
+	//hack to check args without
+	arguments := os.Args[1:]
+	var confFile *string = nil
+	for i := 0; i < len(arguments); i++ {
+		key := strings.TrimSpace(strings.ToLower(arguments[i]))
+		if key == "-config" {
+			if i+1 < len(arguments) {
+				confFile = &arguments[i+1]
+				//hack to remove the config flag
+				os.Args = append(arguments[:i], arguments[i+2:]...)
+
+				break
+			}
+		}
+	}
+
+	if confFile != nil {
+		f, err := os.Open(*confFile)
+		if err != nil {
+			log.Warn("could not open config file, using default")
+			return conf
+		}
+		data, err := io.ReadAll(f)
+		if err != nil {
+			log.Warn("could not read config file, using default")
+			return conf
+		}
+		err = json.Unmarshal(data, &conf)
+		if err != nil {
+			log.Warn("could not parse config file, using default")
+			return conf
+		}
+
+	} else {
+		log.Warn("no config defined, using default")
+	}
+	return conf
 }
 
 func main() {
+	if corral.RunningOnCloudPlatfrom() {
+		RunOnCloud()
+	} else {
+		Run(loadConfig())
+	}
+}
 
-	//TODO:
+//RunOnCloud bypasses some of the local setup for quicker exectuion on the provider side
+func RunOnCloud() {
+	if config == nil || parameter == nil {
+		panic("expected config to be set!")
+	}
 
-	var query queries.Query
+	query, options := setup(*config)
 
-	//TODO: make tuneable
-	query = queries.New(queries.TPCH_Q6)
+	err := query.Read(parameter)
+	if err != nil {
+		panic(err)
+	}
+	Execute(*config, query, options)
+}
 
-	//TODO: make tuneable
-	query.SetExperiment("1")
-	query.SetEndpoint("test")
+//Execute builds the corral driver and runs it
+func Execute(config runConfig, query queries.Query, options []corral.Option) *corral.Driver {
+	driver := corral.NewSequentialMultiStageDriver(query.Create(), options...)
+	if config.Backend != "" && config.Backend != "local" {
+		driver.WithBackend(&config.Backend)
+	}
+	driver.Execute()
 
-	viper.Set("logName", query.Name())
+	return driver
+}
+
+//Run is the main driver and setup logic
+func Run(c runConfig) {
+	query, options := setup(c)
+
+	err := GenerateRunnableFile(c, query)
+	if err != nil {
+		log.Fatalf("failed to generate runnable file %+v", err)
+	}
+	//create driver
+	driver := Execute(c, query, options)
+
+	if c.Validation {
+		//catch activationslog and move ...
+		var results = driver.GetFinalOutputs()
+		temp, err := os.MkdirTemp("", "results")
+		if err != nil {
+			log.Fatalf("query %s failed to create tempory results folder for %+v", query.Name(), err)
+		}
+		err = driver.DownloadAndRemove(results, temp)
+		if err != nil {
+			log.Fatalf("query %s failed to download results %+v", query.Name(), err)
+		}
+		log.Printf("downloaded final resuts at %s", temp)
+
+		files, err := filepath.Glob(filepath.Join(temp, "*"))
+		if err != nil {
+			log.Fatalf("query %s failed find downloaded files %+v", query.Name(), err)
+		}
+		//download results and validate ...
+		success, err := query.Validate(files)
+		if err != nil {
+			log.Fatalf("query %s result is invald %+v", query.Name(), err)
+		}
+		if !success {
+			log.Fatalf("query %s result did not match expectations", query.Name())
+		}
+	}
+
+	if c.Undeploy && c.Backend != "" && c.Backend != "local" {
+		err := driver.Undeploy(&c.Backend)
+		if err != nil {
+			log.Errorf("failed to undeploy %+v", err)
+		}
+	}
+}
+
+func setup(c runConfig) (queries.Query, []corral.Option) {
+	query := queries.New(c.Query)
+	if query == nil {
+		panic(fmt.Errorf("could not create query from config %+v", c))
+	}
+	query.SetExperiment(c.Experiment)
+	query.SetEndpoint(c.Endpoint)
+
+	if c.Randomize {
+		query.Randomize()
+	}
+
+	viper.Set("logDir", "runs")
+	viper.Set("logName", fmt.Sprintf("%s_%s", c.ShortName(), query.Name()))
 
 	options := query.Configure()
 
-	//TODO: Toggle Cache Backend
-	options = append(options,
-		corral.WithLocalMemoryCache(),
-		corral.WithInputs(query.Inputs()...),
-	)
+	options = c.SetupCache(options)
+	return query, options
+}
 
-	//create driver
-	driver := corral.NewMultiStageDriver(query.Create(), options...)
+//we need all this to be able to provide experiment settings at compile time...
+var config *runConfig
+var parameter map[string]string
 
-	if err := query.Check(driver); err != nil {
-		log.Fatalf("query %s check failed", query.Name())
+type config_template struct {
+	Query      int
+	Backend    string
+	Experiment string
+	Endpoint   string
+	Cache      string
+	Params     map[string]string
+}
+
+const runnableTemplate = `package main
+
+import "github.com/tawalaya/corral_plus_tpch/queries"
+
+//file is generated do not modify manually 
+func init(){
+	config = &runConfig{
+		Query:      queries.TPCH_Q{{.Query}},
+		Backend:    "{{.Backend}}",
+		Experiment: "{{.Experiment}}",
+		Endpoint:   "{{.Endpoint}}",
+		Undeploy:   false,
+		Randomize:  false,
+		Cache:      "{{.Cache}}",
 	}
+	
+	parameter = map[string]string{
+		{{ range $key, $value := .Params }}
+			"{{ $key }}":"{{$value}}",
+		{{ end }}
+	}
+}
+`
 
-	driver.Main()
-
-	//catch activationslog and move ...
-	var results = driver.GetFinalOutputs()
-	temp, err := os.MkdirTemp("", "results")
+//GenerateRunnableFile converts the selected config into a static go-file, since corral will compile an executable to run on the cloud
+func GenerateRunnableFile(c runConfig, query queries.Query) error {
+	t := config_template{
+		Query:      int(c.Query) + 1, //offset by 1
+		Backend:    c.Backend,
+		Experiment: c.Experiment,
+		Endpoint:   c.Endpoint,
+		Cache:      c.Cache,
+		Params:     query.Serialize(),
+	}
+	temp := template.New("config")
+	temp, err := temp.Parse(runnableTemplate)
 	if err != nil {
-		log.Fatalf("query %s failed to download results %+v", query.Name(), err)
-	}
-	err = driver.DownloadAndRemove(results, temp)
-	if err != nil {
-		log.Fatalf("query %s failed to download results %+v", query.Name(), err)
-	}
-	log.Printf("downloaded final resuts at %s", temp)
-
-	files, err := filepath.Glob(filepath.Join(temp, "*"))
-	if err != nil {
-		log.Fatalf("query %s failed find downloaded files %+v", query.Name(), err)
-	}
-	//download results and validate ...
-	success, err := query.Validate(files)
-	if err != nil {
-		log.Fatalf("query %s result is invald %+v", query.Name(), err)
-	}
-	if !success {
-		log.Fatalf("query %s result did not match expectations", query.Name())
+		return err
 	}
 
+	f, err := os.OpenFile("runnable.go", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0664)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	err = temp.Execute(f, t)
+	if err != nil {
+		return err
+	}
+	return nil
 }

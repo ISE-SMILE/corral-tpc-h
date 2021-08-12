@@ -1,0 +1,10 @@
+{
+"query": 1,
+"backend": "local",
+"experiment": "1",
+"endpoint": "test",
+"undeploy": true,
+"randomize": true,
+"validation": false,
+"cache": "local"
+}

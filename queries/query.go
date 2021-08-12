@@ -40,8 +40,18 @@ func New(q QueryType) Query {
 	switch q {
 	case TPCH_Q1:
 		query = &Q1{}
+	case TPCH_Q2:
+		query = &Q2{}
 	case TPCH_Q6:
 		query = &Q6{}
+	case TPCH_Q14:
+		query = &Q14{}
+	case TPCH_Q15:
+		query = &Q15{}
+	case TPCH_Q17:
+		query = &Q17{}
+	case TPCH_Q18:
+		query = &Q18{}
 	default:
 		return nil
 	}
@@ -51,12 +61,10 @@ func New(q QueryType) Query {
 
 type Query interface {
 	QueryExperiment
+	Serializable
 
 	//Name unique query name, based on configured inputs
 	Name() string
-
-	//Inputs generates the list of query inputs given a FileSystem
-	Inputs() []string
 
 	//Check if the inputs are ready
 	Check(driver *corral.Driver) error
@@ -75,6 +83,11 @@ type Query interface {
 
 	//Randomze sets random parameters for this query
 	Randomize()
+}
+
+type Serializable interface {
+	Serialize() map[string]string
+	Read(map[string]string) error
 }
 
 type QueryExperiment interface {

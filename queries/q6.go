@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,43 +17,71 @@ import (
 
 type Q6 struct {
 	Experiment
-	Before    time.Time
-	After     time.Time
-	Discound  float64
-	Quantitiy int64
+	Before   time.Time
+	After    time.Time
+	Start    int
+	Discount float64
+	Quantity int64
 }
 
 func (q *Q6) Name() string {
-	return fmt.Sprintf("%s_tcph_q6", q.ShortName())
+	return fmt.Sprintf("%s_tcph_q6_y%.4d_d%d_q%d", q.ShortName(),
+		q.Before.Year(), int(q.Discount*100), q.Quantity)
+}
+
+func (q *Q6) Check(driver *corral.Driver) error {
+	panic("implement me")
 }
 
 func (q *Q6) Default() {
-	before, _ := time.Parse("2006-01-02", "1995-01-01")
-	after, _ := time.Parse("2006-01-02", "1994-01-01")
-
-	q.Discound = 0.05
-	q.Quantitiy = 24
-	q.Before = before
-	q.After = after
+	q.Start = 1
+	q.Discount = 0.06
+	q.Quantity = 24
+	q.configure()
 
 }
 
 func (q *Q6) Randomize() {
-	//TODO:
-	q.Default()
+	q.Start = rand.Intn(4)
+	q.Discount = float64(2+rand.Intn(7)) / 100
+	q.Quantity = int64(24 + rand.Intn(1))
+
+	q.configure()
 }
 
-func (q *Q6) Check(driver *corral.Driver) error {
-	//TODO
-	return nil
+func (q *Q6) configure() {
+	date, _ := time.Parse("2006-01-02", "1993-01-01")
+	date = date.AddDate(q.Start, 0, 0)
+	after := date.AddDate(1, 0, 0)
+	q.Before = date
+	q.After = after
 }
 
-func (q *Q6) Inputs() []string {
-	return inputTables(q, "lineitem")
+func (q *Q6) Serialize() map[string]string {
+	m := make(map[string]string)
+	m["start"] = fmt.Sprintf("%d", q.Start)
+	m["discount"] = fmt.Sprintf("%d", int(q.Discount*100))
+	m["quantity"] = fmt.Sprintf("%d", q.Quantity)
+
+	return m
+}
+
+func (q *Q6) Read(m map[string]string) (err error) {
+	start, err := strconv.ParseInt(m["start"], 10, 32)
+	discount, err := strconv.ParseInt(m["discount"], 10, 32)
+	quantity, err := strconv.ParseInt(m["quantity"], 10, 32)
+
+	q.Start = int(start)
+	q.Discount = float64(discount) / 100
+	q.Quantity = quantity
+	q.configure()
+
+	return err
 }
 
 func (q *Q6) Configure() []corral.Option {
 	return []corral.Option{
+		corral.WithInputs(inputTables(q, "lineitem")...),
 		corral.WithSplitSize(25 * 1024 * 1024),
 		corral.WithMapBinSize(200 * 1024 * 1024),
 		corral.WithReduceBinSize(200 * 1024 * 1024),
@@ -101,7 +131,7 @@ func (q *Q6) Create() []*corral.Job {
 			and l_quantity < 24
 **/
 func (w *Q6) Map(key, value string, emitter corral.Emitter) {
-	line := &LineItem{}
+	line := LineItem()
 
 	err := line.Read(value)
 	if err != nil {
@@ -110,14 +140,14 @@ func (w *Q6) Map(key, value string, emitter corral.Emitter) {
 	}
 	//first the where clause
 
-	quantitiy, _ := line.GetAs("L_QUANTITY", Integer)
-	discound, _ := line.GetAs("L_DISCOUNT", Float)
-	shipdate, _ := line.GetAs("L_SHIPDATE", SQLDate)
+	quantitiy, _ := line.LookupAs("L_QUANTITY", Integer)
+	discound, _ := line.LookupAs("L_DISCOUNT", Float)
+	shipdate, _ := line.LookupAs("L_SHIPDATE", SQLDate)
 	//we could optimize this fruther by doing a sting length check before conferting to a string
-	where := quantitiy.(int64) < w.Quantitiy && math.Abs(discound.(float64)-w.Discound) <= 0.01 && shipdate.(time.Time).Before(w.Before) && shipdate.(time.Time).After(w.After)
+	where := quantitiy.(int64) < w.Quantity && math.Abs(discound.(float64)-w.Discount) <= 0.01 && shipdate.(time.Time).Before(w.Before) && shipdate.(time.Time).After(w.After)
 
 	if where {
-		extendedprice, _ := line.GetAs("L_EXTENDEDPRICE", Float)
+		extendedprice, _ := line.LookupAs("L_EXTENDEDPRICE", Float)
 		prod := discound.(float64) * extendedprice.(float64)
 		_ = emitter.Emit("revenue", fmt.Sprintf("%f", prod))
 	}

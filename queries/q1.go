@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -16,21 +17,43 @@ import (
 
 type Q1 struct {
 	Experiment
+	Delta    int
 	Shipdate time.Time
 }
 
+func (q *Q1) Serialize() map[string]string {
+	m := make(map[string]string)
+	m["delta"] = fmt.Sprintf("%d", q.Delta)
+	return m
+}
+
+func (q *Q1) Read(m map[string]string) (err error) {
+	delta, err := strconv.ParseInt(m["delta"], 10, 32)
+
+	q.Delta = int(delta)
+	q.configure()
+
+	return err
+}
+
 func (q *Q1) Default() {
-	date, _ := time.Parse("2006-01-02", "1998-09-01")
+	q.Delta = 90
+	q.configure()
+}
+
+func (q *Q1) configure() {
+	date, _ := time.Parse("2006-01-02", "1998-12-01")
+	date = date.AddDate(0, 0, -q.Delta)
 	q.Shipdate = date
 }
 
 func (q *Q1) Randomize() {
-	//TODO:
-	q.Default()
+	q.Delta = 60 + rand.Intn(60)
+	q.configure()
 }
 
 func (q *Q1) Name() string {
-	return fmt.Sprintf("%s_tcp_q1", q.ShortName())
+	return fmt.Sprintf("%s_tcph_q1_d%.2d", q.ShortName(), q.Delta)
 }
 
 func (q *Q1) Check(driver *corral.Driver) error {
@@ -38,12 +61,9 @@ func (q *Q1) Check(driver *corral.Driver) error {
 	return nil
 }
 
-func (q *Q1) Inputs() []string {
-	return inputTables(q, "lineitem")
-}
-
 func (q *Q1) Configure() []corral.Option {
 	return []corral.Option{
+		corral.WithInputs(inputTables(q, "lineitem")...),
 		corral.WithSplitSize(25 * 1024 * 1024),
 		corral.WithMapBinSize(100 * 1024 * 1024),
 		corral.WithReduceBinSize(200 * 1024 * 1024),
@@ -105,7 +125,7 @@ func (q *Q1) Create() []*corral.Job {
 **/
 
 func (w *Q1) Map(key, value string, emitter corral.Emitter) {
-	line := &LineItem{}
+	line := LineItem()
 
 	err := line.Read(value)
 	if err != nil {
@@ -113,7 +133,7 @@ func (w *Q1) Map(key, value string, emitter corral.Emitter) {
 		return
 	}
 
-	shipdate, err := line.GetAs("L_SHIPDATE", SQLDate)
+	shipdate, err := line.LookupAs("L_SHIPDATE", SQLDate)
 	if err != nil {
 		log.Infof("failed to emit %s,+%v", key, err)
 		return

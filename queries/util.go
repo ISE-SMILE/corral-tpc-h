@@ -1,6 +1,7 @@
 package queries
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -8,10 +9,14 @@ import (
 
 func inputTables(q QueryExperiment, tables ...string) []string {
 	inputs := make([]string, 0)
-
-	inputs = append(inputs, strings.Join([]string{q.GetPrefix(), "lineitem", "*"}, "/"))
-
+	for _, table := range tables {
+		inputs = append(inputs, strings.Join([]string{q.GetPrefix(), table, "*"}, "/"))
+	}
 	return inputs
+}
+
+func isInputTable(w Query, key, table string) bool {
+	return strings.HasPrefix(key, fmt.Sprintf("%s/%s", w.GetPrefix(), table))
 }
 
 func SQLDate(val string) interface{} {
@@ -31,4 +36,13 @@ func Integer(val string) interface{} {
 func Float(val string) interface{} {
 	r, _ := strconv.ParseFloat(val, 64)
 	return r
+}
+
+//fast concatenation
+func concat(l string, r string) string {
+	bs := make([]byte, len(l)+len(r)+1)
+	i := copy(bs, l)
+	bs[i] = '|'
+	copy(bs[i+1:], r)
+	return string(bs)
 }
