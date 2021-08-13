@@ -7,9 +7,9 @@ import (
 	"fmt"
 )
 
-const _supplierFieldsName = "S_SUPPKEYS_NAMES_ADDRESSS_NATIONKEYS_PHONES_ACCTBALS_COMMEN"
+const _supplierFieldsName = "S_SUPPKEYS_NAMES_ADDRESSS_NATIONKEYS_PHONES_ACCTBALS_COMMENT"
 
-var _supplierFieldsIndex = [...]uint8{0, 9, 15, 24, 35, 42, 51, 59}
+var _supplierFieldsIndex = [...]uint8{0, 9, 15, 24, 35, 42, 51, 60}
 
 func (i supplierFields) String() string {
 	if i < 0 || i >= supplierFields(len(_supplierFieldsIndex)-1) {
@@ -27,7 +27,7 @@ var _supplierFieldsNameToValueMap = map[string]supplierFields{
 	_supplierFieldsName[24:35]: 3,
 	_supplierFieldsName[35:42]: 4,
 	_supplierFieldsName[42:51]: 5,
-	_supplierFieldsName[51:59]: 6,
+	_supplierFieldsName[51:60]: 6,
 }
 
 // supplierFieldsString retrieves an enum value from the enum constants string name.

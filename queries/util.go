@@ -2,6 +2,7 @@ package queries
 
 import (
 	"fmt"
+	"github.com/ISE-SMILE/corral"
 	"strconv"
 	"strings"
 	"time"
@@ -21,8 +22,8 @@ func isInputTable(w Query, key, table string) bool {
 
 func SQLDate(val string) interface{} {
 	s_year, _ := strconv.Atoi(val[0:4])
-	s_month, _ := strconv.Atoi(val[6:7])
-	s_day, _ := strconv.Atoi(val[9:10])
+	s_month, _ := strconv.Atoi(val[5:7])
+	s_day, _ := strconv.Atoi(val[8:10])
 
 	//Shipdate, _ := time.Parse("2006-01-02", line[L_SHIPDATE])
 	return time.Date(s_year, time.Month(s_month), s_day, 0, 0, 0, 0, time.Local)
@@ -45,4 +46,10 @@ func concat(l string, r string) string {
 	bs[i] = '|'
 	copy(bs[i+1:], r)
 	return string(bs)
+}
+
+type Identity struct{}
+
+func (i Identity) Map(key, value string, emitter corral.Emitter) {
+	emitter.Emit(key, value)
 }

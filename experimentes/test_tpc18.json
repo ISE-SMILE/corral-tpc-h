@@ -1,9 +1,9 @@
 {
-"query": 0,
+"query": 17,
 "backend": "local",
 "experiment": "1",
 "endpoint": "test",
-"undeploy": false,
+"undeploy": true,
 "randomize": true,
 "validation": false,
 "cache": "redis"

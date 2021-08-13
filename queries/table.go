@@ -243,3 +243,48 @@ func Region() *GenericTable {
 		lookup:    func(s string) (int, error) { val, err := regionFieldsString(s); return int(val), err },
 	}
 }
+
+//go:generate enumer -type=orderFields
+type orderFields int
+
+const (
+	O_ORDERKEY orderFields = iota
+	O_CUSTKEY
+	O_ORDERSTATUS
+	O_TOTALPRICE
+	O_ORDERDATE
+	O_ORDERPRIORITY
+	O_CLERK
+	O_SHIPPRIORITY
+	O_COMMENT
+)
+
+func Order() *GenericTable {
+	return &GenericTable{
+		Name:      "order",
+		numFields: 9,
+		lookup:    func(s string) (int, error) { val, err := orderFieldsString(s); return int(val), err },
+	}
+}
+
+//go:generate enumer -type=customerFields
+type customerFields int
+
+const (
+	C_CUSTKEY customerFields = iota
+	C_NAME
+	C_ADDRESS
+	C_NATIONKEY
+	C_PHONE
+	C_ACCTBAL
+	C_MKTSEGMENT
+	C_COMMENT
+)
+
+func Customer() *GenericTable {
+	return &GenericTable{
+		Name:      "customer",
+		numFields: 9,
+		lookup:    func(s string) (int, error) { val, err := customerFieldsString(s); return int(val), err },
+	}
+}

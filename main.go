@@ -214,6 +214,15 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 
 	options := query.Configure()
 
+	if c.Backend == "local" {
+		wd, err := os.MkdirTemp("", "corral")
+		if err == nil {
+			options = append(options, corral.WithWorkingLocation(wd))
+		}
+	} else {
+		panic("need to implement this for cloud run mode!")
+	}
+
 	options = c.SetupCache(options)
 	return query, options
 }

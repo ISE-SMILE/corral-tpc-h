@@ -20,12 +20,13 @@ func (q *Q18) Check(driver *corral.Driver) error {
 	panic("implement me")
 }
 
-func (q *Q18) Create() []*corral.Job {
-	panic("implement me")
-}
-
 func (q *Q18) Configure() []corral.Option {
 	return []corral.Option{
+		corral.WithMultiStageInputs([][]string{
+			inputTables(q, "orders", "lineitem"),
+			inputTables(q, "customer"),
+		}),
+
 		corral.WithInputs(inputTables(q, "customer", "orders", "lineitem")...),
 	}
 }
@@ -54,4 +55,52 @@ func (q *Q18) Default() {
 
 func (q *Q18) Randomize() {
 	q.QUANTITY = 312 + rand.Intn(3)
+}
+
+func (q *Q18) Create() []*corral.Job {
+	orderJoin := &Join{
+		Query: q,
+		left:  LineItem(),
+		right: Order(),
+		on:    [2]int{int(L_ORDERKEY), int(O_ORDERKEY)},
+		filter: [2]Projection{
+			func(table *GenericTable) []int {
+				return []int{
+					int(L_QUANTITY),
+				}
+			},
+			func(table *GenericTable) []int {
+				return []int{
+					int(O_CUSTKEY), int(O_ORDERKEY), int(O_ORDERDATE), int(O_TOTALPRICE),
+				}
+			},
+		},
+		customReduce: func(join *Join, key string, left, right []string, emitter corral.Emitter) {
+
+			sum := 0.0
+			for _, quant := range left {
+				sum += Float(quant).(float64)
+			}
+
+			if sum > float64(q.QUANTITY) {
+				for _, line := range right {
+					emitter.Emit(key, concat(line, fmt.Sprintf("%f", sum)))
+				}
+			}
+
+		},
+	}
+
+	customerJoin := &Join{
+		Query: q,
+		left:  &GenericTable{},
+		right: Customer(),
+		on:    [2]int{0, int(C_CUSTKEY)},
+	}
+
+	return []*corral.Job{
+		corral.NewJob(orderJoin, orderJoin),
+		corral.NewJob(customerJoin, customerJoin),
+		//TODO: sort
+	}
 }

@@ -3,8 +3,8 @@
 "backend": "local",
 "experiment": "1",
 "endpoint": "test",
-"undeploy": true,
+"undeploy": false,
 "randomize": true,
 "validation": false,
-"cache": "local"
+"cache": "redis"
 }
