@@ -20,8 +20,9 @@ import (
 )
 
 var (
-	build string = "Debug"
-	seed  int64
+	build  string = "Debug"
+	seed   int64
+	strict bool = false
 )
 
 func init() {
@@ -258,11 +259,17 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 
 	options := query.Configure()
 
-	if c.Backend == "local" {
+	if !(strings.HasPrefix(c.Endpoint, "s3") || strings.HasPrefix(c.Endpoint, "minio")) {
 		wd, err := os.MkdirTemp("", "corral")
 		if err == nil {
 			options = append(options, corral.WithWorkingLocation(wd))
 		}
+	} else {
+		options = append(options, corral.WithWorkingLocation(fmt.Sprintf("%s/%s", c.Endpoint, "output")))
+	}
+
+	if c.Backend == "local" {
+
 	} else {
 		panic("need to implement this for cloud run mode!")
 	}
