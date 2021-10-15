@@ -25,8 +25,8 @@ type TableEntry interface {
 }
 
 func RandomContainerName() string {
-	var Syllable1 = [...]string{"SM", "LG", "MED", "JUMBO", "CAN", "DRUM"}
-	var Syllable2 = [...]string{"CASE", "BOX", "BAG", "PKG", "PACK", "CAN", "DRUM"}
+	var Syllable1 = [...]string{"SM", "LG", "MED", "JUMBO", "WRAP"}
+	var Syllable2 = [...]string{"CASE", "BOX", "BAG", "JAR", "PKG", "PACK", "CAN", "DRUM"}
 
 	i := rand.Intn(len(Syllable1))
 	j := rand.Intn(len(Syllable2))

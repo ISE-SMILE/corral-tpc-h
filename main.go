@@ -15,12 +15,19 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	"github.com/tawalaya/corral_plus_tpch/queries"
+
+	"github.com/go-git/go-git/v5"
+)
+
+var (
+	build string = "Debug"
+	seed  int64
 )
 
 func init() {
-	seed := time.Now().UnixNano()
+	seed = time.Now().UnixNano()
 	rand.Seed(seed)
-	log.Infof("using Seed %x", seed)
+	log.Infof("using seed %x", seed)
 }
 
 type runConfig struct {
@@ -37,7 +44,11 @@ type runConfig struct {
 }
 
 func (c runConfig) ShortName() string {
-	return fmt.Sprintf("%.2s_%.2X", c.Backend, c.Cache)
+	if c.Cache == "" {
+		return fmt.Sprintf("%.2s_%.2X_%X_%s", c.Backend, "local", seed, build)
+	} else {
+		return fmt.Sprintf("%.2s_%.2X_%X_%s", c.Backend, c.Cache, seed, build)
+	}
 }
 
 func (c runConfig) SetupCache(options []corral.Option) []corral.Option {
@@ -117,10 +128,43 @@ func loadConfig() runConfig {
 	return conf
 }
 
+func EnsureCleanBuild() error {
+	repo, err := git.PlainOpen(".")
+	if err != nil {
+		return err
+	}
+
+	tree, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	status, err := tree.Status()
+	if err != nil {
+		return err
+	}
+
+	if !status.IsClean() {
+		return fmt.Errorf("unclean version can't ensure repoducability")
+	}
+
+	ref, err := repo.Head()
+	if err != nil {
+		return err
+	}
+
+	build = ref.String()
+	return nil
+}
+
 func main() {
 	if corral.RunningOnCloudPlatfrom() {
 		RunOnCloud()
 	} else {
+		err := EnsureCleanBuild()
+		if err != nil {
+			panic(err)
+		}
 		Run(loadConfig())
 	}
 }
