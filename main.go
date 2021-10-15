@@ -45,9 +45,9 @@ type runConfig struct {
 
 func (c runConfig) ShortName() string {
 	if c.Cache == "" {
-		return fmt.Sprintf("%.2s_%.2X_%X_%s", c.Backend, "local", seed, build)
+		return fmt.Sprintf("%.2s_%.2X_%X_%.8s", c.Backend, "local", seed, build)
 	} else {
-		return fmt.Sprintf("%.2s_%.2X_%X_%s", c.Backend, c.Cache, seed, build)
+		return fmt.Sprintf("%.2s_%.2X_%X_%.8s", c.Backend, c.Cache, seed, build)
 	}
 }
 
@@ -153,7 +153,7 @@ func EnsureCleanBuild() error {
 		return err
 	}
 
-	build = ref.String()
+	build = ref.Hash().String()
 	return nil
 }
 
