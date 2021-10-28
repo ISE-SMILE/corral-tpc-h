@@ -3,7 +3,7 @@ module github.com/tawalaya/corral_plus_tpch
 go 1.15
 
 require (
-	github.com/ISE-SMILE/corral v0.1.1
+	github.com/ISE-SMILE/corral v0.1.2
 	github.com/go-git/go-git v4.7.0+incompatible
 	github.com/go-git/go-git/v5 v5.4.2
 	github.com/google/martian/v3 v3.1.0
