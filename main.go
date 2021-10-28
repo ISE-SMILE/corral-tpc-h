@@ -259,6 +259,7 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 
 	options := query.Configure()
 
+	//check if we need to rewrite working locations
 	if !(strings.HasPrefix(c.Endpoint, "s3") || strings.HasPrefix(c.Endpoint, "minio")) {
 		wd, err := os.MkdirTemp("", "corral")
 		if err == nil {
@@ -268,9 +269,8 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 		options = append(options, corral.WithWorkingLocation(fmt.Sprintf("%s/%s", c.Endpoint, "output")))
 	}
 
-	if c.Backend == "local" {
-
-	} else {
+	//check if we want to run on a cloud platform
+	if c.Backend != "local" && c.Cache != "" {
 		panic("need to implement this for cloud run mode!")
 	}
 
