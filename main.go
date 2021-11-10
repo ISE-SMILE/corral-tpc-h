@@ -37,12 +37,16 @@ type runConfig struct {
 	Experiment string            `json:"experiment,omitempty"`
 	Endpoint   string            `json:"endpoint,omitempty"`
 
-	Undeploy   bool `json:"undeploy,omitempty"`
-	Randomize  bool `json:"randomize,omitempty"`
-	Validation bool `json:"validation,omitempty"`
+	Undeploy   bool   `json:"undeploy,omitempty"`
+	Randomize  bool   `json:"randomize,omitempty"`
+	Validation bool   `json:"validation,omitempty"`
+	Debug      bool   `json:"debug,omitempty"`
+	Cache      string `json:"cache,omitempty"`
 
-	Cache string `json:"cache,omitempty"`
+	CorralConfig map[string]interface{} `json:"-"`
 }
+
+var runConfigKeys = [...]string{"query", "backend", "experiment", "endpoint", "undeploy", "randomize", "validation", "cache", "debug"}
 
 func (c runConfig) ShortName() string {
 	if c.Cache == "" {
@@ -122,10 +126,26 @@ func loadConfig() runConfig {
 			log.Warn("could not parse config file, using default")
 			return conf
 		}
-
+		err = json.Unmarshal(data, &conf)
+		if err != nil {
+			log.Warn("could not parse config file, using default")
+			return conf
+		}
+		//campture other config data to paas to corral directly
+		err = json.Unmarshal(data, &conf.CorralConfig)
+		if err != nil {
+			log.Warn("could not parse config file, using default")
+			return conf
+		}
 	} else {
 		log.Warn("no config defined, using default")
 	}
+
+	//remove all keys that are part of the core conf...
+	for _, k := range runConfigKeys {
+		delete(conf.CorralConfig, k)
+	}
+
 	return conf
 }
 
@@ -162,10 +182,6 @@ func main() {
 	if corral.RunningOnCloudPlatfrom() {
 		RunOnCloud()
 	} else {
-		err := EnsureCleanBuild()
-		if err != nil {
-			panic(err)
-		}
 		Run(loadConfig())
 	}
 }
@@ -198,9 +214,15 @@ func Execute(config runConfig, query queries.Query, options []corral.Option) *co
 
 //Run is the main driver and setup logic
 func Run(c runConfig) {
+
 	query, options := setup(c)
 
-	err := GenerateRunnableFile(c, query)
+	err := EnsureCleanBuild()
+	if err != nil && !viper.GetBool("debug") {
+		panic(err)
+	}
+
+	err = GenerateRunnableFile(c, query)
 	if err != nil {
 		log.Fatalf("failed to generate runnable file %+v", err)
 	}
@@ -252,6 +274,10 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 
 	if c.Randomize {
 		query.Randomize()
+	}
+
+	for k, v := range c.CorralConfig {
+		viper.Set(k, v)
 	}
 
 	viper.Set("logDir", "runs")
