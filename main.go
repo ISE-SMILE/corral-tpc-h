@@ -20,9 +20,8 @@ import (
 )
 
 var (
-	build  string = "Debug"
-	seed   int64
-	strict bool = false
+	build string = "Debug"
+	seed  int64
 )
 
 func init() {
@@ -54,6 +53,10 @@ func (c runConfig) ShortName() string {
 	} else {
 		return fmt.Sprintf("%.2s_%.2X_%X_%.8s", c.Backend, c.Cache, seed, build)
 	}
+}
+
+func (c runConfig) isLocal() bool {
+	return c.Backend == "local" || c.Backend == ""
 }
 
 func (c runConfig) SetupCache(options []corral.Option) []corral.Option {
@@ -91,7 +94,7 @@ func loadConfig() runConfig {
 		Undeploy:   false,
 		Randomize:  false,
 		Validation: false,
-		Cache:      "local",
+		Cache:      "",
 	}
 
 	//hack to check args without
@@ -296,7 +299,7 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 	}
 
 	//check if we want to run on a cloud platform
-	if c.Backend != "local" && c.Cache != "" {
+	if !c.isLocal() {
 		panic("need to implement this for cloud run mode!")
 	}
 

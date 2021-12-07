@@ -1,6 +1,6 @@
 module github.com/tawalaya/corral_plus_tpch
 
-go 1.15
+go 1.16
 
 require (
 	github.com/ISE-SMILE/corral v0.1.3
