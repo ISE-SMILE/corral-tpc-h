@@ -98,15 +98,14 @@ func loadConfig() runConfig {
 	}
 
 	//hack to check args without
-	arguments := os.Args[1:]
 	var confFile *string = nil
-	for i := 0; i < len(arguments); i++ {
-		key := strings.TrimSpace(strings.ToLower(arguments[i]))
+	for i := 0; i < len(os.Args); i++ {
+		key := strings.TrimSpace(strings.ToLower(os.Args[i]))
 		if key == "-config" {
-			if i+1 < len(arguments) {
-				confFile = &arguments[i+1]
+			if i+1 < len(os.Args) {
+				confFile = &os.Args[i+1]
 				//hack to remove the config flag
-				os.Args = append(arguments[:i], arguments[i+2:]...)
+				os.Args = append(os.Args[:i], os.Args[i+2:]...)
 
 				break
 			}
