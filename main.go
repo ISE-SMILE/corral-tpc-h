@@ -117,6 +117,7 @@ func loadConfig() runConfig {
 	}
 
 	if confFile != nil {
+		log.Infof("using config file: %f", confFile)
 		f, err := os.Open(*confFile)
 		if err != nil {
 			log.Warn("could not open config file, using default")
@@ -125,11 +126,6 @@ func loadConfig() runConfig {
 		data, err := io.ReadAll(f)
 		if err != nil {
 			log.Warn("could not read config file, using default")
-			return conf
-		}
-		err = json.Unmarshal(data, &conf)
-		if err != nil {
-			log.Warn("could not parse config file, using default")
 			return conf
 		}
 		err = json.Unmarshal(data, &conf)
@@ -224,7 +220,7 @@ func Run(c runConfig) {
 	query, options := setup(c)
 
 	err := EnsureCleanBuild()
-	if err != nil && !viper.GetBool("debug") {
+	if err != nil && !(viper.GetBool("debug") || c.Debug) {
 		panic(err)
 	}
 
