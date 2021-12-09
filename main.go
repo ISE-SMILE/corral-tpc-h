@@ -59,6 +59,10 @@ func (c runConfig) isLocal() bool {
 	return c.Backend == "local" || c.Backend == ""
 }
 
+func (c runConfig) usesCache() bool {
+	return c.Cache != ""
+}
+
 func (c runConfig) SetupCache(options []corral.Option) []corral.Option {
 
 	switch c.Backend {
@@ -298,7 +302,7 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 	}
 
 	//check if we want to run on a cloud platform
-	if !c.isLocal() {
+	if !c.isLocal() && c.usesCache() {
 		panic("need to implement this for cloud run mode!")
 	}
 
