@@ -54,6 +54,8 @@ github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/ISE-SMILE/corral v0.1.4 h1:gnE7oeu31R+69BjJKbq6JQwG4ECLebefhV4pwbs0VtY=
 github.com/ISE-SMILE/corral v0.1.4/go.mod h1:XSpM/tFQIuNeZiFdF59y+4596fLFeuJ9NkL77CIaP6s=
+github.com/ISE-SMILE/corral v0.1.5 h1:l4pwU7D1Tiiwc9mx6DN283mGxFKBfdlP4u4IVItWpgg=
+github.com/ISE-SMILE/corral v0.1.5/go.mod h1:XSpM/tFQIuNeZiFdF59y+4596fLFeuJ9NkL77CIaP6s=
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
 github.com/Microsoft/go-winio v0.4.16/go.mod h1:XB6nPKklQyQ7GC9LdcBEcBl8PF76WugXOPRXwdLnMv0=
 github.com/Microsoft/go-winio v0.5.0/go.mod h1:JPGBdM1cNvN/6ISo+n8V5iA4v8pBzdOpzfwIujj1a84=
