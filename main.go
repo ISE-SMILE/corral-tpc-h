@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ISE-SMILE/corral/api"
 	"io"
 	"math/rand"
 	"os"
@@ -264,6 +265,8 @@ func Run(c runConfig) {
 			log.Errorf("failed to undeploy %+v", err)
 		}
 	}
+	//ensure that started plugins are terminated
+	api.StopAllRunningPlugins()
 }
 
 func setup(c runConfig) (queries.Query, []corral.Option) {
