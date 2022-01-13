@@ -117,7 +117,7 @@ func loadConfig() runConfig {
 	}
 
 	if confFile != nil {
-		log.Infof("using config file: %f", confFile)
+		log.Infof("using config file: %s", *confFile)
 		f, err := os.Open(*confFile)
 		if err != nil {
 			log.Warn("could not open config file, using default")
@@ -221,7 +221,7 @@ func Run(c runConfig) {
 
 	err := EnsureCleanBuild()
 	if err != nil && !(viper.GetBool("debug") || c.Debug) {
-		panic(err)
+		log.Warn("performing experiment on unclean build")
 	}
 
 	err = GenerateRunnableFile(c, query)
