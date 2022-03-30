@@ -65,6 +65,7 @@ func (q *Join) Reduce(key string, values corral.ValueIterator, emitter corral.Em
 	left := make([]string, 0)
 	right := make([]string, 0)
 	for value := range values.Iter() {
+		//value[2:] == "SIDE|"
 		if value[0] == '0' {
 			left = append(left, value[2:])
 		} else {

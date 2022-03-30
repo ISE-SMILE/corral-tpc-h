@@ -296,6 +296,7 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 		if err == nil {
 			options = append(options, corral.WithWorkingLocation(wd))
 		}
+		log.Infof("using working directory %s", wd)
 	} else {
 		options = append(options, corral.WithWorkingLocation(fmt.Sprintf("%s/%s", c.Endpoint, "output")))
 	}

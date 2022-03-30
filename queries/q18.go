@@ -5,6 +5,7 @@ import (
 	"github.com/ISE-SMILE/corral"
 	"math/rand"
 	"strconv"
+	"time"
 )
 
 type Q18 struct {
@@ -25,6 +26,7 @@ func (q *Q18) Configure() []corral.Option {
 		corral.WithMultiStageInputs([][]string{
 			inputTables(q, "orders", "lineitem"),
 			inputTables(q, "customer"),
+			[]string{},
 		}),
 
 		corral.WithInputs(inputTables(q, "customer", "orders", "lineitem")...),
@@ -58,6 +60,7 @@ func (q *Q18) Randomize() {
 }
 
 func (q *Q18) Create() []*corral.Job {
+	//L_OrderKey,O_CUSTKEY,O_ORDERKEY,O_ORDERDATE,O_TOTALPRICE, SUM(L_Quantity)
 	orderJoin := &Join{
 		Query: q,
 		left:  LineItem(),
@@ -81,26 +84,60 @@ func (q *Q18) Create() []*corral.Job {
 			for _, quant := range left {
 				sum += Float(quant).(float64)
 			}
-
 			if sum > float64(q.QUANTITY) {
-				for _, line := range right {
-					emitter.Emit(key, concat(line, fmt.Sprintf("%f", sum)))
-				}
+				_ = emitter.Emit(key, concat(right[0], fmt.Sprintf("%f", sum)))
 			}
 
 		},
 	}
 
+	//C_NAME,C_CUSTKEY,O_ORDERKEY,O_ORDERDATE,O_TOTALPRICE, SUM(L_Quantity)
 	customerJoin := &Join{
 		Query: q,
 		left:  &GenericTable{},
 		right: Customer(),
 		on:    [2]int{0, int(C_CUSTKEY)},
+		filter: [2]Projection{
+			//lets take all
+			func(table *GenericTable) []int {
+				return []int{
+					0, 1, 2, 3,
+				}
+			},
+			func(table *GenericTable) []int {
+				return []int{
+					int(C_NAME),
+				}
+			},
+		},
+		customReduce: func(join *Join, key string, left, right []string, emitter corral.Emitter) {
+			for _, l := range left {
+				for _, r := range right {
+					emitter.Emit("", concat(r, l))
+				}
+			}
+		},
+	}
+
+	sort := &Sort{
+		Query: q,
+		from:  &GenericTable{},
+		on:    []int{4, 3, 2},
+		keyMapper: func(keys []string) string {
+			//O_TOTALPROCE
+			total := 10000000000 - Integer(keys[0]).(int64)
+			//Date
+			date := SQLDate(keys[1]).(time.Time).Unix()
+			//key
+			key := Integer(keys[2]).(int64)
+
+			return fmt.Sprintf("%10d%32d%d", total, date, key)
+		},
 	}
 
 	return []*corral.Job{
 		corral.NewJob(orderJoin, orderJoin),
 		corral.NewJob(customerJoin, customerJoin),
-		//TODO: sort
+		corral.NewJob(sort, sort),
 	}
 }
