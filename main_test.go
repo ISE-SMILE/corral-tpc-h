@@ -15,7 +15,7 @@ var conf = runConfig{
 	Undeploy:   false,
 	Randomize:  false,
 	Validation: false,
-	Cache:      "redis",
+	Cache:      "",
 }
 
 func test(t *testing.T, job queries.QueryType) {

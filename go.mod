@@ -26,5 +26,3 @@ require (
 	golang.org/x/time v0.0.0-20211116232009-f0f3c7e86c11 // indirect
 	google.golang.org/genproto v0.0.0-20220112215332-a9c7c0acf9f2 // indirect
 )
-
-replace github.com/ISE-SMILE/corral v0.1.3 => ../corral

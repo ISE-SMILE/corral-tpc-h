@@ -6,3 +6,4 @@ runnable.go
 job*/
 runs/
 *.iml
+test/

@@ -8,7 +8,7 @@ import (
 type Sort struct {
 	Query
 	from *GenericTable
-	on    int
+	on   int
 }
 
 func (s *Sort) Map(key, value string, emitter corral.Emitter) {
@@ -23,7 +23,6 @@ func (s *Sort) Map(key, value string, emitter corral.Emitter) {
 		log.Errorf("failed to sort")
 	}
 }
-
 
 func (s *Sort) Reduce(key string, values corral.ValueIterator, emitter corral.Emitter) {
 
