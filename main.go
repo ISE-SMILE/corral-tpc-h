@@ -229,8 +229,37 @@ func Run(c runConfig) {
 	if err != nil {
 		log.Fatalf("failed to generate runnable file %+v", err)
 	}
+
+	metrics, err := api.CollectMetrics(map[string]string{
+		"CEX":    "Experiment",
+		"CQN":    "Query",
+		"CBE":    "Backend",
+		"BUILD":  "Build",
+		"CRND":   "Randomized",
+		"CCACHE": "CacheType",
+		"CMEM":   "Configured Memory",
+		"CFN":    "ExperimentFlags",
+		"RLat":   "TotalRuntime",
+	})
+
 	//create driver
 	driver := Execute(c, query, options)
+
+	//collect run metrics
+	metrics.Start()
+	metrics.Collect(map[string]interface{}{
+		"RId":    -1,
+		"CEX":    c.Experiment,
+		"CQN":    c.Query,
+		"CBE":    c.Backend,
+		"BUILD":  build,
+		"CRND":   c.Randomize,
+		"CCACHE": c.Cache,
+		"CMEM":   viper.GetInt("lambdaMemory"),
+		"CFN":    corral.CompileFlagName(),
+		"RLat":   driver.Runtime.Milliseconds(),
+	})
+	metrics.Reset()
 
 	if c.Validation {
 		//catch activationslog and move ...
@@ -267,6 +296,8 @@ func Run(c runConfig) {
 	}
 	//ensure that started plugins are terminated
 	api.StopAllRunningPlugins()
+
+	fmt.Println(metrics.Info())
 }
 
 func setup(c runConfig) (queries.Query, []corral.Option) {

@@ -44,6 +44,8 @@ func New(q QueryType) Query {
 		query = &Q2{}
 	case TPCH_Q6:
 		query = &Q6{}
+	case TPCH_Q11:
+		query = &Q11{}
 	case TPCH_Q14:
 		query = &Q14{}
 	case TPCH_Q15:

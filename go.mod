@@ -3,7 +3,7 @@ module github.com/tawalaya/corral_plus_tpch
 go 1.16
 
 require (
-	github.com/ISE-SMILE/corral v0.1.6
+	github.com/ISE-SMILE/corral v0.2.1
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/ProtonMail/go-crypto v0.0.0-20220113124808-70ae35bab23f // indirect
 	github.com/apache/openwhisk-client-go v0.0.0-20211007130743-38709899040b // indirect
