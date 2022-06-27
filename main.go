@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ISE-SMILE/corral/api"
 	"io"
 	"math/rand"
 	"os"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"github.com/ISE-SMILE/corral/api"
 
 	"github.com/ISE-SMILE/corral"
 	log "github.com/sirupsen/logrus"
@@ -28,7 +29,6 @@ var (
 func init() {
 	seed = time.Now().UnixNano()
 	rand.Seed(seed)
-	log.Infof("using seed %x", seed)
 }
 
 type runConfig struct {
@@ -41,7 +41,7 @@ type runConfig struct {
 	Randomize  bool   `json:"randomize,omitempty"`
 	Validation bool   `json:"validation,omitempty"`
 	Debug      bool   `json:"debug,omitempty"`
-	Cache      string `json:"cache,omitempty"`
+	Cache      string `json:"tpchCache,omitempty"`
 
 	CorralConfig map[string]interface{} `json:"-"`
 }
@@ -65,24 +65,26 @@ func (c runConfig) usesCache() bool {
 }
 
 func (c runConfig) SetupCache(options []corral.Option) []corral.Option {
+	if _, ok := c.CorralConfig["redisDeploymentType"]; !ok {
+		switch c.Backend {
+		case "lambda":
+			viper.Set("redisDeploymentType", 2)
+		case "whisk":
+			viper.Set("redisDeploymentType", 1)
+		case "local":
+			fallthrough
+		default:
+			viper.Set("redisDeploymentType", 0)
 
-	switch c.Backend {
-	case "lambda":
-		viper.Set("redisDeploymentType", 2)
-	case "whisk":
-		viper.Set("redisDeploymentType", 1)
-	case "local":
-		fallthrough
-	default:
-		viper.Set("redisDeploymentType", 0)
-
+		}
 	}
 
 	switch c.Cache {
 	case "local":
 		return append(options, corral.WithLocalMemoryCache())
 	case "redis":
-		return append(options, corral.WithRedisBackedCache())
+		//Reids needs smaller map sizes
+		return append(options, corral.WithRedisBackedCache(), corral.WithMultipleSize(0.3))
 
 	}
 	return options
@@ -119,27 +121,12 @@ func loadConfig() runConfig {
 
 	if confFile != nil {
 		log.Infof("using config file: %s", *confFile)
-		f, err := os.Open(*confFile)
+		rconf, err := readConfigFile(*confFile)
 		if err != nil {
-			log.Warn("could not open config file, using default")
+			log.Warnf("Error reading config file: %s", err)
 			return conf
 		}
-		data, err := io.ReadAll(f)
-		if err != nil {
-			log.Warn("could not read config file, using default")
-			return conf
-		}
-		err = json.Unmarshal(data, &conf)
-		if err != nil {
-			log.Warn("could not parse config file, using default")
-			return conf
-		}
-		//campture other config data to paas to corral directly
-		err = json.Unmarshal(data, &conf.CorralConfig)
-		if err != nil {
-			log.Warn("could not parse config file, using default")
-			return conf
-		}
+		conf = *rconf
 	} else {
 		log.Warn("no config defined, using default")
 	}
@@ -150,6 +137,28 @@ func loadConfig() runConfig {
 	}
 
 	return conf
+}
+
+func readConfigFile(confFile string) (*runConfig, error) {
+	var conf runConfig
+	f, err := os.Open(confFile)
+	if err != nil {
+		return nil, fmt.Errorf("could not open config file %e", err)
+	}
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("could not read config file %e", err)
+	}
+	err = json.Unmarshal(data, &conf)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse config file %e", err)
+	}
+	//campture other config data to paas to corral directly
+	err = json.Unmarshal(data, &conf.CorralConfig)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse config file %e", err)
+	}
+	return &conf, nil
 }
 
 func EnsureCleanBuild() error {
@@ -201,13 +210,13 @@ func RunOnCloud() {
 	if err != nil {
 		panic(err)
 	}
-	Execute(*config, query, options)
+	Execute(*config, query, false, options)
 }
 
 //Execute builds the corral driver and runs it
-func Execute(config runConfig, query queries.Query, options []corral.Option) *corral.Driver {
+func Execute(config runConfig, query queries.Query, withBackendClient bool, options []corral.Option) *corral.Driver {
 	driver := corral.NewSequentialMultiStageDriver(query.Create(), options...)
-	if config.Backend != "" && config.Backend != "local" {
+	if withBackendClient && (config.Backend != "" && config.Backend != "local") {
 		driver.WithBackend(&config.Backend)
 	}
 	driver.Execute()
@@ -217,8 +226,24 @@ func Execute(config runConfig, query queries.Query, options []corral.Option) *co
 
 //Run is the main driver and setup logic
 func Run(c runConfig) {
+	log.SetLevel(log.TraceLevel)
+	log.Debugf("using seed %x", seed)
 
 	query, options := setup(c)
+
+	//check if we want to run on a cloud platform
+	if !c.isLocal() && c.usesCache() {
+		if v, ok := c.CorralConfig["redisDeploymentType"]; ok {
+			if v != "prebaked" {
+				panic("need to implement this for cloud run mode!")
+			}
+		} else {
+			panic("need to implement this for cloud run mode!")
+		}
+
+	}
+
+	options = c.SetupCache(options)
 
 	err := EnsureCleanBuild()
 	if err != nil && !(viper.GetBool("debug") || c.Debug) {
@@ -243,7 +268,7 @@ func Run(c runConfig) {
 	})
 
 	//create driver
-	driver := Execute(c, query, options)
+	driver := Execute(c, query, true, options)
 
 	//collect run metrics
 	metrics.Start()
@@ -332,12 +357,6 @@ func setup(c runConfig) (queries.Query, []corral.Option) {
 		options = append(options, corral.WithWorkingLocation(fmt.Sprintf("%s/%s", c.Endpoint, "output")))
 	}
 
-	//check if we want to run on a cloud platform
-	if !c.isLocal() && c.usesCache() {
-		panic("need to implement this for cloud run mode!")
-	}
-
-	options = c.SetupCache(options)
 	return query, options
 }
 
@@ -346,12 +365,13 @@ var config *runConfig
 var parameter map[string]string
 
 type config_template struct {
-	Query      int
-	Backend    string
-	Experiment string
-	Endpoint   string
-	Cache      string
-	Params     map[string]string
+	Query        string
+	Backend      string
+	Experiment   string
+	Endpoint     string
+	Cache        string
+	CorralConfig map[string]string
+	Params       map[string]string
 }
 
 const runnableTemplate = `package main
@@ -361,7 +381,7 @@ import "github.com/tawalaya/corral_plus_tpch/queries"
 //file is generated do not modify manually 
 func init(){
 	config = &runConfig{
-		Query:      queries.TPCH_Q{{.Query}},
+		Query:      queries.{{.Query}},
 		Backend:    "{{.Backend}}",
 		Experiment: "{{.Experiment}}",
 		Endpoint:   "{{.Endpoint}}",
@@ -381,7 +401,7 @@ func init(){
 //GenerateRunnableFile converts the selected config into a static go-file, since corral will compile an executable to run on the cloud
 func GenerateRunnableFile(c runConfig, query queries.Query) error {
 	t := config_template{
-		Query:      int(c.Query) + 1, //offset by 1
+		Query:      c.Query.String(), //offset by 1
 		Backend:    c.Backend,
 		Experiment: c.Experiment,
 		Endpoint:   c.Endpoint,

@@ -27,16 +27,16 @@ To run the benchmark, you can use the following command: `go run main.go -config
 }
 ```
 
-|     Name     | Description                                                       | Default |
-|:------------:|-------------------------------------------------------------------|:-------:|
-|   `query`    | The tpc-h query to run, 0-21.                                     |   `0`   |
-|  `backend`   | The backend to use, local, lambda, whisk.                         | `local` |
-| `experiment` | The folder/bucket the experiment data is in.                      |   `1`   |
-|  `endpoint`  | The data endpoint, e.g., a folder or a s3-url                     | `test`  |
-|  `undeploy`  | Whether to undeploy all resouces after the query run              | `false` |
-| `randomize`  | Whether to randomize the query parameter                          | `true`  |
-| `validation` | Whether to validate the result, only possible if randomized=false | `false` |
-|   `cache`    | The cache to use, redis, efs, etc.                                |   ``    |
+|     Name     | Description                                                                                                                     | Default |
+|:------------:|---------------------------------------------------------------------------------------------------------------------------------|:-------:|
+|   `query`    | The tpc-h query to run, 0-21.                                                                                                   |   `0`   |
+|  `backend`   | The backend to use, local, lambda, whisk.                                                                                       | `local` |
+| `experiment` | The folder/bucket the experiment data is in. We assume that this is a number equivalent to the sf factor of the tpch experiment |   `1`   |
+|  `endpoint`  | The data endpoint, e.g., a folder or a s3-url                                                                                   | `test`  |
+|  `undeploy`  | Whether to undeploy all resources after the query run                                                                           | `false` |
+| `randomize`  | Whether to randomize the query parameter                                                                                        | `true`  |
+| `validation` | Whether to validate the result, only possible if randomized=false                                                               | `false` |
+|   `cache`    | The cache to use, redis, efs, etc.                                                                                              |   ``    |
 
 You can add all corral config parameter to this config file, and they will be forwarded to corral.
 

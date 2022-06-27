@@ -53,7 +53,7 @@ func (q *Q6) configure() {
 	date, _ := time.Parse("2006-01-02", "1993-01-01")
 	date = date.AddDate(q.Start, 0, 0)
 	after := date.AddDate(1, 0, 0)
-	q.Before = date
+	q.Before = date.AddDate(0, 0, -1)
 	q.After = after
 }
 
@@ -82,9 +82,9 @@ func (q *Q6) Read(m map[string]string) (err error) {
 func (q *Q6) Configure() []corral.Option {
 	return []corral.Option{
 		corral.WithInputs(inputTables(q, "lineitem")...),
-		corral.WithSplitSize(25 * 1024 * 1024),
-		corral.WithMapBinSize(200 * 1024 * 1024),
-		corral.WithReduceBinSize(200 * 1024 * 1024),
+		corral.WithSplitSize(32 * 1024 * 1024),
+		corral.WithMapBinSize(128 * 1024 * 1024),
+		corral.WithReduceBinSize(64 * 1024 * 1024),
 	}
 }
 
@@ -140,15 +140,20 @@ func (w *Q6) Map(key, value string, emitter corral.Emitter) {
 	}
 	//first the where clause
 
-	quantitiy, _ := line.LookupAs("L_QUANTITY", Integer)
-	discound, _ := line.LookupAs("L_DISCOUNT", Float)
+	quantity, _ := line.LookupAs("L_QUANTITY", Integer)
+	discount, _ := line.LookupAs("L_DISCOUNT", Float)
 	shipdate, _ := line.LookupAs("L_SHIPDATE", SQLDate)
 	//we could optimize this fruther by doing a sting length check before conferting to a string
-	where := quantitiy.(int64) < w.Quantity && math.Abs(discound.(float64)-w.Discount) <= 0.01 && shipdate.(time.Time).Before(w.Before) && shipdate.(time.Time).After(w.After)
+	where := quantity.(int64) < w.Quantity && math.Abs(discount.(float64)-w.Discount) <= 0.01 && shipdate.(time.Time).After(w.Before) && shipdate.(time.Time).Before(w.After)
+	//log.Infof("DATE %v", shipdate)
+	//log.Infof("BEFORE DATE %v", w.Before)
+	//log.Infof("START DATE %b", shipdate.(time.Time).After(w.Before))
+	//log.Infof("END DATE %b", shipdate.(time.Time).Before(w.After))
 
 	if where {
+
 		extendedprice, _ := line.LookupAs("L_EXTENDEDPRICE", Float)
-		prod := discound.(float64) * extendedprice.(float64)
+		prod := discount.(float64) * extendedprice.(float64)
 		_ = emitter.Emit("revenue", fmt.Sprintf("%f", prod))
 	}
 

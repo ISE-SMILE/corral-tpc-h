@@ -7,6 +7,7 @@ import (
 	"github.com/ISE-SMILE/corral"
 )
 
+//go:generate go run github.com/dmarkham/enumer -type=QueryType
 type QueryType int
 
 const (
@@ -32,6 +33,7 @@ const (
 	TPCH_Q20
 	TPCH_Q21
 	TPCH_Q22
+	TPCH_IO
 )
 
 //New Returns a default Query for a given type, randomize the tunables if for a full-scale experiment
@@ -54,6 +56,10 @@ func New(q QueryType) Query {
 		query = &Q17{}
 	case TPCH_Q18:
 		query = &Q18{}
+	case TPCH_Q21:
+		query = &Q21{}
+	case TPCH_IO:
+		query = &QIO{}
 	default:
 		return nil
 	}
@@ -83,7 +89,7 @@ type Query interface {
 	//Default sets the default parameters for this query
 	Default()
 
-	//Randomze sets random parameters for this query
+	//Randomize sets random parameters for this query
 	Randomize()
 }
 

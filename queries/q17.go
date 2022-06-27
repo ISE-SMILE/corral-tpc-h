@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Q17 struct {
@@ -55,8 +56,9 @@ func (q *Q17) Check(driver *corral.Driver) error {
 func (q *Q17) Configure() []corral.Option {
 	return []corral.Option{
 		corral.WithInputs(inputTables(q, "lineitem", "part")...),
-		corral.WithMapBinSize(100 * 1048576),
-		corral.WithReduceBinSize(80 * 1048576),
+		corral.WithSplitSize(64 * 1024 * 1024),
+		corral.WithMapBinSize(256 * 1024 * 1024),
+		corral.WithReduceBinSize(128 * 1024 * 1024),
 	}
 }
 
@@ -134,7 +136,8 @@ func (w *Q17PreCollect) Map(key, value string, emitter corral.Emitter) {
 		}
 
 		k, _ := line.Lookup("L_PARTKEY")
-		emitter.Emit(k, value)
+		proj, _ := line.Select("L_QUANTITY", "L_EXTENDEDPRICE")
+		emitter.Emit(k, strings.Join(proj, "|"))
 	} else if isInputTable(w, key, "part") {
 
 		//we can alread do the prefilter of the quanity select at this stage...
@@ -166,7 +169,8 @@ func (w *Q17PreCollect) Reduce(key string, values corral.ValueIterator, emitter 
 	parts := 0
 	for value := range values.Iter() {
 		if value != "PART" {
-			line := LineItem()
+			line := &GenericTable{}
+			_ = line.Read(value)
 			group = append(group, line)
 			err := line.Read(value)
 			if err != nil {
@@ -174,11 +178,7 @@ func (w *Q17PreCollect) Reduce(key string, values corral.ValueIterator, emitter 
 				return
 			}
 
-			quantiy, err := line.LookupAs("L_QUANTITY", Float)
-			if err != nil {
-				log.Infof("failed to emit %s,+%v", key, err)
-				return
-			}
+			quantiy := line.GetAs(0, Float)
 			avg += quantiy.(float64)
 		} else {
 			parts++
@@ -189,10 +189,10 @@ func (w *Q17PreCollect) Reduce(key string, values corral.ValueIterator, emitter 
 	if parts > 0 && len(group) > 0 {
 		avg = (avg / float64(len(group))) * 0.2
 		for _, line := range group {
-			q, _ := line.LookupAs("L_QUANTITY", Float)
+			q := line.GetAs(0, Float)
 			//we just assume that err != nil ...
 			if q.(float64) < avg {
-				p, _ := line.LookupAs("L_EXTENDEDPRICE", Float)
+				p := line.GetAs(1, Float)
 				sum += p.(float64)
 			}
 		}

@@ -16,7 +16,7 @@ type Q11 struct {
 }
 
 func (q *Q11) Name() string {
-	return fmt.Sprintf("%s_tcph_q2_n%s_f%g", q.ShortName(), q.Nation, q.Fraction)
+	return fmt.Sprintf("%s_tcph_q11_n%s_f%g", q.ShortName(), q.Nation, q.Fraction)
 }
 
 func (q *Q11) Check(driver *corral.Driver) error {
@@ -34,9 +34,9 @@ func (q *Q11) Configure() []corral.Option {
 
 	return []corral.Option{
 		corral.WithMultiStageInputs(inputs),
-		corral.WithSplitSize(25 * 1024 * 1024),
-		corral.WithMapBinSize(100 * 1024 * 1024),
-		corral.WithReduceBinSize(200 * 1024 * 1024),
+		corral.WithSplitSize(64 * 1024 * 1024),
+		corral.WithMapBinSize(192 * 1024 * 1024),
+		corral.WithReduceBinSize(192 * 1024 * 1024),
 	}
 }
 
@@ -70,7 +70,11 @@ func (q *Q11) Default() {
 
 func (q *Q11) Randomize() {
 	//by definiton expermient is a folder coresponding to the sf
-	sf := Integer(q.experiment).(int64)
+	sf, err := strconv.ParseInt(q.experiment, 10, 64)
+	if err != nil {
+		sf = 1
+	}
+
 	q.Fraction = 0.0001 / float64(sf)
 	q.Nation = RandomNation()
 }

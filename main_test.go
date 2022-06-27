@@ -45,10 +45,12 @@ var test_queries = [...]queries.QueryType{
 	queries.TPCH_Q1,
 	queries.TPCH_Q2,
 	queries.TPCH_Q6,
+	queries.TPCH_Q11,
 	queries.TPCH_Q14,
 	queries.TPCH_Q15,
 	queries.TPCH_Q17,
 	queries.TPCH_Q18,
+	queries.TPCH_Q21,
 }
 
 func TestLocal(t *testing.T) {
@@ -86,4 +88,15 @@ func TestLocalRemoteMinio(t *testing.T) {
 //	}
 //	//create driver
 //	_ = Execute(conf, query, options)
+//}
+
+//func TestGenerateRunnableFile(t *testing.T) {
+//	cnf, err := readConfigFile("examples/test_tpc01_ow_minio.json")
+//	if err != nil {
+//		t.Fatalf("failed to read config file %+v", err)
+//	}
+//	err = GenerateRunnableFile(*cnf, queries.New(queries.TPCH_Q1))
+//	if err != nil {
+//		t.Fatalf("failed to generate runnable file %+v", err)
+//	}
 //}

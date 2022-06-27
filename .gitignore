@@ -7,3 +7,4 @@ job*/
 runs/
 *.iml
 test/
+Plots.ipynb

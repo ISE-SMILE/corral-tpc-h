@@ -33,6 +33,9 @@ func (q *Q14) Configure() []corral.Option {
 			inputTables(q, "lineitem", "part"),
 			[]string{},
 		}),
+		corral.WithSplitSize(64 * 1024 * 1024),
+		corral.WithMapBinSize(256 * 1024 * 1024),
+		corral.WithReduceBinSize(128 * 1024 * 1024),
 	}
 }
 

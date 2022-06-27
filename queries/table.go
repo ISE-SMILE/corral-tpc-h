@@ -122,7 +122,7 @@ func maskSelect(mask []int, data []string) ([]string, error) {
 	return result, nil
 }
 
-//go:generate enumer -type=lineItemFields
+//go:generate go run github.com/dmarkham/enumer -type=lineItemFields
 type lineItemFields int
 
 const (
@@ -152,7 +152,7 @@ func LineItem() *GenericTable {
 	}
 }
 
-//go:generate enumer -type=partFields
+//go:generate go run github.com/dmarkham/enumer -type=partFields
 type partFields int
 
 const (
@@ -175,7 +175,7 @@ func Part() *GenericTable {
 	}
 }
 
-//go:generate enumer -type=supplierFields
+//go:generate go run github.com/dmarkham/enumer -type=supplierFields
 type supplierFields int
 
 const (
@@ -196,7 +196,7 @@ func Supplier() *GenericTable {
 	}
 }
 
-//go:generate enumer -type=partsuppFields
+//go:generate go run github.com/dmarkham/enumer -type=partsuppFields
 type partsuppFields int
 
 const (
@@ -215,7 +215,7 @@ func Partsupp() *GenericTable {
 	}
 }
 
-//go:generate enumer -type=nationFields
+//go:generate go run github.com/dmarkham/enumer -type=nationFields
 type nationFields int
 
 const (
@@ -233,7 +233,7 @@ func Nation() *GenericTable {
 	}
 }
 
-//go:generate enumer -type=regionFields
+//go:generate go run github.com/dmarkham/enumer -type=regionFields
 type regionFields int
 
 const (
@@ -250,7 +250,7 @@ func Region() *GenericTable {
 	}
 }
 
-//go:generate enumer -type=orderFields
+//go:generate go run github.com/dmarkham/enumer -type=orderFields
 type orderFields int
 
 const (
@@ -273,7 +273,7 @@ func Order() *GenericTable {
 	}
 }
 
-//go:generate enumer -type=customerFields
+//go:generate go run github.com/dmarkham/enumer -type=customerFields
 type customerFields int
 
 const (

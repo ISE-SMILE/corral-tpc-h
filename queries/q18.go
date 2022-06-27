@@ -28,8 +28,10 @@ func (q *Q18) Configure() []corral.Option {
 			inputTables(q, "customer"),
 			[]string{},
 		}),
-
-		corral.WithInputs(inputTables(q, "customer", "orders", "lineitem")...),
+		corral.WithSplitSize(64 * 1024 * 1024),
+		corral.WithMapBinSize(256 * 1024 * 1024),
+		corral.WithReduceBinSize(256 * 1024 * 1024),
+		//corral.WithInputs(inputTables(q, "customer", "orders", "lineitem")...),
 	}
 }
 
